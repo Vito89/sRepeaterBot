@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/Vito89/arithmeticutil"
+	"github.com/Vito89/heaputil"
 	"log"
 	"regexp"
 	"strings"
@@ -10,13 +12,16 @@ import (
 	tgbotapi "github.com/Syfaro/telegram-bot-api"
 )
 
-const chatID = 0
-const chatToken = "chatToken"
-const TGI_API_TIMEOUT = 60
-const IS_DEBUG_MODE = true
-const SHOW_WORDS_STATISTIC_CMD = "WORD_STAT"
-const SHOW_WORDS_STATISTIC_REGEXP = "[^a-zA-Z0-9]+"
-const SHOW_WORDS_STATISTIC_TIMEOUT = 24
+const (
+	chatID                       = 0
+	chatToken                    = "chatToken"
+	TGI_API_TIMEOUT              = 60
+	IS_DEBUG_MODE                = true
+	SHOW_WORDS_STATISTIC_CMD     = "WORD_STAT"
+	SHOW_WORDS_STATISTIC_REGEXP  = "[^a-zA-Z0-9]+"
+	SHOW_WORDS_STATISTIC_TIMEOUT = 24
+	STATISTIC_MAX_SIZE           = 7
+)
 
 func main() {
 	reg, err := regexp.Compile(SHOW_WORDS_STATISTIC_REGEXP)
@@ -54,10 +59,12 @@ func main() {
 			}
 
 		case systemUpdate := <-sysChannel:
-			log.Printf("SystemUpdate was received:", systemUpdate)
+			log.Printf("System update was received: %s", systemUpdate)
+
 			switch systemUpdate {
 			case SHOW_WORDS_STATISTIC_CMD:
-				showStatisticMessageSend()
+				bot.Send(tgbotapi.NewMessage(chatID, showStatisticMessageSend(heaputil.GetHeap(countWordsMap))))
+				countWordsMap = make(map[string]int)
 			}
 		}
 	}
@@ -66,7 +73,7 @@ func main() {
 func initBotAPI() *tgbotapi.BotAPI {
 	log.Printf("Sending tgBotAPI.NewBotAPI POST")
 
-	bot, err := tgbotapi.NewBotAPI(fmt.Sprintf("%s:%s", chatID, chatToken))
+	bot, err := tgbotapi.NewBotAPI(fmt.Sprintf("%d:%s", chatID, chatToken))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -82,6 +89,15 @@ func newUserMessageSend(bot tgbotapi.BotAPI, newChatMembersSize int, userName st
 	bot.Send(tgbotapi.NewMessage(chatID, msgText))
 }
 
-func showStatisticMessageSend() {
-	// TODO("not implemented")
+func showStatisticMessageSend(heapArray *heaputil.KVHeap) string {
+	var topSize = arithmeticutil.Min(STATISTIC_MAX_SIZE, len(*heapArray))
+	if topSize < 1 {
+		return fmt.Sprintf(`Today we have empty top :(`)
+	}
+	var stringContent = ""
+	for jj := 1; jj <= topSize; jj++ {
+		stringContent = fmt.Sprintf("%s\n<%d place> %#v", stringContent, jj, heapArray.HeapPop())
+	}
+
+	return fmt.Sprintf(`Today we have top of the list:%s`, stringContent)
 }
